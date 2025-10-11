@@ -14,6 +14,7 @@ export const userRoutes={
     LOGIN_USER:"/login",
     GET_USER_PROFILE:"/profile",
     UPDATE_USER_PROFILE:"/update-profile",
+    CHANGE_PASSWORD:"/change-password",
     GET_ALL_USERS:"/",
     DELETE_USER:"/delete-user",
     VERIFY_OTP:"/verify-otp",

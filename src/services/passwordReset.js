@@ -2,6 +2,7 @@
 
 import { getUserByEmail, findUserByIdAndUpdate } from '../mvc/database/db.user.js';
 import { sendEmail } from './emailService.js';
+import User from '../mvc/models/user.js';
 import crypto from 'crypto';
 
 const generateResetToken = () => {
@@ -48,7 +49,12 @@ export const sendPasswordResetEmail = async (req) => {
     });
 
     // Create reset URL
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+    const frontendUrl = process.env.NODE_ENV === 'development' 
+      ? 'http://localhost:3000' 
+      : (process.env.FRONTEND_URL || 'http://localhost:3000');
+    const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
+    
+    console.log('Password reset URL:', resetUrl);
     
     // Email content
     const emailContent = {
@@ -125,6 +131,11 @@ export const resetPassword = async (req) => {
   try {
     const { token, password } = req.body;
     
+    // Create frontend URL for development
+    const frontendUrl = process.env.NODE_ENV === 'development' 
+      ? 'http://localhost:3000' 
+      : (process.env.FRONTEND_URL || 'http://localhost:3000');
+    
     if (!token || !password) {
       return {
         success: false,
@@ -185,7 +196,7 @@ export const resetPassword = async (req) => {
             </p>
             
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/login" 
+              <a href="${frontendUrl}/login" 
                  style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                         color: white; 
                         padding: 15px 30px; 

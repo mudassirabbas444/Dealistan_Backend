@@ -3,7 +3,8 @@ import {
     verifyOTP,
     resendOTP,
     generateOTP,
-    saveOTP
+    saveOTP,
+    generateToken
 } from "../../database/db.user.js";
 import { sendEmail } from "../../../services/emailService.js";
 
@@ -21,6 +22,9 @@ const verifyOTPService = async (req) => {
         
         const user = await verifyOTP(userId, otp);
         
+        // Generate token for login
+        const token = generateToken(user._id);
+        
         return {
             success: true,
             message: "Email verified successfully",
@@ -34,7 +38,8 @@ const verifyOTPService = async (req) => {
                 role: user.role,
                 verified: user.verified,
                 emailVerified: user.emailVerified
-            }
+            },
+            token
         };
     }
     catch(error) {
@@ -140,7 +145,7 @@ const sendOTPEmail = async (email, name, otp) => {
             </div>
         `;
         
-        return await sendEmail(email, subject, html);
+        return await sendEmail({ to: email, subject, html });
     }
     catch(error) {
         return {

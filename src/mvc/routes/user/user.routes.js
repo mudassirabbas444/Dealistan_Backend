@@ -24,6 +24,9 @@ router.get(userRoutes.GET_USER_PROFILE, auth, userController.getUserProfileContr
 // Update user profile (requires authentication)
 router.put(userRoutes.UPDATE_USER_PROFILE, auth, sanitizeRequestBody, validateAvatarMiddleware, userController.updateUserProfileController);
 
+// Change password (requires authentication)
+router.put(userRoutes.CHANGE_PASSWORD, auth, userController.changePasswordController);
+
 // Get all users (requires authentication - admin only)
 router.get(userRoutes.GET_ALL_USERS, auth, isAdmin, userController.getAllUsersController);
 

@@ -4,16 +4,32 @@
 
 import nodemailer from 'nodemailer';
 
-// Create transporter
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT || 587,
-  secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+// Create transporter function (lazy loading)
+const createTransporter = () => {
+  console.log('Email Service Configuration:');
+  console.log('EMAIL_SERVICE:', process.env.EMAIL_SERVICE || 'gmail');
+  console.log('EMAIL_USER:', process.env.EMAIL_USER ? 'Set' : 'Not set');
+  console.log('EMAIL_PASS:', process.env.EMAIL_PASS ? 'Set' : 'Not set');
+  console.log('SMTP_USER:', process.env.SMTP_USER ? 'Set' : 'Not set');
+  console.log('SMTP_PASS:', process.env.SMTP_PASS ? 'Set' : 'Not set');
+
+  // Use EMAIL_* variables first, fallback to SMTP_* variables
+  const emailUser = process.env.EMAIL_USER || process.env.SMTP_USER;
+  const emailPass = process.env.EMAIL_PASS || process.env.SMTP_PASS;
+  const emailService = process.env.EMAIL_SERVICE || 'gmail';
+
+  console.log('Using email credentials:');
+  console.log('User:', emailUser ? 'Set' : 'Not set');
+  console.log('Pass:', emailPass ? 'Set' : 'Not set');
+
+  return nodemailer.createTransport({
+    service: emailService,
+    auth: {
+      user: emailUser,
+      pass: emailPass,
+    },
+  });
+};
 
 /**
  * Send email using nodemailer
@@ -32,8 +48,12 @@ export const sendEmail = async (emailData) => {
       throw new Error('Missing required email fields: to, subject, html');
     }
 
+    // Create transporter when needed
+    const transporter = createTransporter();
+    const emailUser = process.env.EMAIL_USER || process.env.SMTP_USER;
+
     const mailOptions = {
-      from: `"Dealistaan" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+      from: `"Dealistaan" <${emailUser}>`,
       to,
       subject,
       html,
@@ -61,6 +81,7 @@ export const sendEmail = async (emailData) => {
  */
 export const verifyEmailConfig = async () => {
   try {
+    const transporter = createTransporter();
     await transporter.verify();
     return {
       success: true,

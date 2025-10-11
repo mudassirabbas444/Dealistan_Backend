@@ -11,8 +11,8 @@
     "test:endpoints": "node test-endpoints.js",
     "seed": "node scripts/insertSampleData.js",
     "build": "echo 'No build step required for Node.js'",
-    "vercel-dev": "vercel dev",
-    "vercel-build": "echo 'Build completed'"
+    "netlify-dev": "netlify dev",
+    "render-build": "npm install"
   },
   "author": "",
   "license": "ISC",

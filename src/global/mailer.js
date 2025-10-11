@@ -1,31 +1,23 @@
-import nodemailer from "nodemailer";
-import dotenv from "dotenv";
+import { sendEmail as sendEmailService } from "../services/emailService.js";
 
-export const transporter=nodemailer.createTransport({
-    service:"gmail",
-    auth:{
-        user:process.env.EMAIL_USER,
-        pass:process.env.EMAIL_PASSWORD
-    }
-})
-
-export const sendEmail=async(receiverEmail,subject,html)=>{
-    try{
-        const mailOptions={
-            from: `"MyApp" <${process.env.EMAIL_USER}>`,
-            to:receiverEmail,
-            subject,
-            html
-        }
-        await transporter.sendMail(mailOptions)
+// Re-export the standardized email service for backward compatibility
+export const sendEmail = async (receiverEmail, subject, html) => {
+    try {
+        const emailData = {
+            to: receiverEmail,
+            subject: subject,
+            html: html
+        };
+        
+        const result = await sendEmailService(emailData);
         return {
-            success:true,
-            message:"Email sent successfully"
-        }
-    }catch(error){
+            success: result.success,
+            message: result.message
+        };
+    } catch (error) {
         return {
-            success:false,
-            message:error.message
-        }
+            success: false,
+            message: error.message
+        };
     }
-}
+};
