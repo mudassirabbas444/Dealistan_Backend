@@ -21,6 +21,8 @@ const io = new Server(server, {
 });
 
 const PORT = process.env.PORT || 5000;
+
+// Add middleware
 app.use(cors({ 
     origin: "*",
     credentials: false
@@ -29,6 +31,7 @@ app.use(cors({
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
+// Routes
 app.get('/', (req, res) => {
     res.send('Hello from server');
 });
@@ -37,23 +40,30 @@ app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         message: 'Server is running',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        port: PORT,
+        environment: process.env.NODE_ENV || 'development'
     });
 });
 
+// Initialize routes
 routes(app);
 
 // Initialize Socket.IO handlers and expose io globally
 setIO(io);
 initializeSocketHandlers(io);
 
-// Initialize database connection and start server
-connectDB().then(() => {
-    server.listen(PORT, () => {
-        console.log(`Server is running on port ${PORT}`);
-        console.log(`Socket.IO server is ready for connections`);
+// Start server immediately (don't wait for DB connection)
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Socket.IO server is ready for connections`);
+    
+    // Connect to database after server starts
+    connectDB().then(() => {
+        console.log('Database connected successfully');
+    }).catch((error) => {
+        console.error('Database connection failed:', error);
+        // Don't exit - let server run without DB for debugging
     });
-}).catch((error) => {
-    console.error('Failed to start server:', error);
-    process.exit(1);
 });
