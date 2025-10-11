@@ -23,40 +23,36 @@ const createTransporter = () => {
   console.log('User:', emailUser ? 'Set' : 'Not set');
   console.log('Pass:', emailPass ? 'Set' : 'Not set');
 
+  // Check if SendGrid is configured
+  const sendGridApiKey = process.env.SENDGRID_API_KEY;
+  
+  if (sendGridApiKey) {
+    console.log('Using SendGrid email service');
+    return nodemailer.createTransport({
+      service: 'SendGrid',
+      auth: {
+        user: 'apikey',
+        pass: sendGridApiKey,
+      },
+    });
+  }
+  
   // For production, use more robust SMTP configuration
   if (process.env.NODE_ENV === 'production') {
-    console.log('Using production SMTP configuration');
+    console.log('Using production SMTP configuration (Gmail)');
     
-    // Try multiple SMTP configurations for better reliability
-    const smtpConfigs = [
-      {
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false,
-        auth: { user: emailUser, pass: emailPass },
-        tls: { rejectUnauthorized: false },
-        connectionTimeout: 60000,
-        greetingTimeout: 30000,
-        socketTimeout: 60000,
-        debug: false,
-        logger: false
-      },
-      {
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
-        auth: { user: emailUser, pass: emailPass },
-        tls: { rejectUnauthorized: false },
-        connectionTimeout: 60000,
-        greetingTimeout: 30000,
-        socketTimeout: 60000,
-        debug: false,
-        logger: false
-      }
-    ];
-    
-    // Return the first configuration (port 587)
-    return nodemailer.createTransport(smtpConfigs[0]);
+    return nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      auth: { user: emailUser, pass: emailPass },
+      tls: { rejectUnauthorized: false },
+      connectionTimeout: 30000,
+      greetingTimeout: 15000,
+      socketTimeout: 30000,
+      debug: false,
+      logger: false
+    });
   } else {
     // For development, use simple service configuration
     console.log('Using development SMTP configuration');
@@ -80,7 +76,7 @@ const createTransporter = () => {
  * @returns {Promise<Object>} - Send result
  */
 export const sendEmail = async (emailData, retryCount = 0) => {
-  const maxRetries = process.env.NODE_ENV === 'production' ? 3 : 1;
+  const maxRetries = process.env.NODE_ENV === 'production' ? 2 : 1;
   
   try {
     const { to, subject, html, text } = emailData;
