@@ -6,13 +6,16 @@ export const createUser = async (userData) => {
     try {
         const { password, ...otherData } = userData;
         
-        // Hash password
-        const saltRounds = 10;
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
+        // Hash password if provided (for regular registration)
+        let hashedPassword = null;
+        if (password) {
+            const saltRounds = 10;
+            hashedPassword = await bcrypt.hash(password, saltRounds);
+        }
         
         const user = new User({
             ...otherData,
-            password: hashedPassword
+            ...(hashedPassword && { password: hashedPassword })
         });
         
         return await user.save();

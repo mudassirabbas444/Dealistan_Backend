@@ -10,7 +10,7 @@ dotenv.config();
 // Connect to MongoDB
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/dealistaan');
+    await mongoose.connect("mongodb+srv://theunionsoft_db_user:Mudassir%40444@cluster0.gldsxsw.mongodb.net/Dealistaan?retryWrites=true&w=majority&appName=Cluster0");
     console.log('Connected to MongoDB');
   } catch (error) {
     console.error('MongoDB connection error:', error);

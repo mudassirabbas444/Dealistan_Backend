@@ -81,7 +81,9 @@ export const authenticateWithGoogle = async (idToken) => {
         avatar: userInfo.picture,
         emailVerified: userInfo.emailVerified,
         verified: true, 
-        role: 'user'
+        role: 'user',
+        phone: `google_${userInfo.googleId}`, // Temporary phone for Google users
+        city: 'Not specified'
       };
       
       const newUser = await createUser(newUserData);
