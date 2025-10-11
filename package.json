@@ -1,0 +1,36 @@
+{
+  "name": "dealistaan",
+  "version": "1.0.0",
+  "description": "Dealistaan - A classified ads marketplace",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "node test-endpoints.js",
+    "test:endpoints": "node test-endpoints.js",
+    "seed": "node scripts/insertSampleData.js",
+    "build": "echo 'No build step required for Node.js'",
+    "netlify-dev": "netlify dev"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "firebase-admin": "^13.5.0",
+    "google-auth-library": "^10.4.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.19.0",
+    "multer": "^2.0.2",
+    "node-fetch": "^3.3.2",
+    "nodemailer": "^7.0.9",
+    "serverless-http": "^4.0.0",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
