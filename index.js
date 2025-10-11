@@ -14,36 +14,17 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: process.env.CLIENT_URL || "http://localhost:3000",
-        methods: ["GET", "POST"],
-        credentials: true
+        origin: "*",
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+        credentials: false
     }
 });
 
 const PORT = process.env.PORT || 5000;
-const allowedOrigins = [
-    'https://dealistan-frontend-git-main-dealistaans-projects.vercel.app',
-    'https://dealistan-frontend.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:3001',
-  ];
-  
- 
-  const corsOptions = {
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      if (origin.includes('vercel.app')) return callback(null, true);
-      return callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  };
-  
-  app.use(cors(corsOptions));
-  app.options('*', cors(corsOptions));
-  
+app.use(cors({ 
+    origin: "*",
+    credentials: false
+}));
 
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
