@@ -6,6 +6,7 @@ export const {
     loginUser,
     getUserProfile,
     updateUserProfile,
+    changePassword,
     getAllUsersService,
     deleteUser
 } = userServices;
