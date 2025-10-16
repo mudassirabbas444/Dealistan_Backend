@@ -1,4 +1,5 @@
 import { validateFirebaseUrls, extractFilenameFromFirebaseUrl } from '../utils/firebaseValidation.js';
+import { bucket } from '../global/firebaseAdmin.js';
 
 export const cleanupProductImages = async (product) => {
   try {
@@ -26,14 +27,24 @@ export const cleanupProductImages = async (product) => {
     }
 
     const imageFilenames = urlValidation.validUrls.map(url => extractFilenameFromFirebaseUrl(url));
-    
-    console.log(`Product ${product._id} deleted. Images to cleanup:`, imageFilenames);
-    
-    return {
-      success: true,
-      message: `Cleaned up ${imageFilenames.length} images`,
-      cleanedImages: imageFilenames
-    };
+
+    // Attempt deletions if bucket available
+    if (bucket && imageFilenames.length > 0) {
+      const deleteResults = await Promise.allSettled(
+        imageFilenames.map(name => bucket.file(name).delete({ ignoreNotFound: true }))
+      );
+      const failures = deleteResults.filter(r => r.status === 'rejected');
+      console.log(`Product ${product._id} deleted. Images cleanup attempted: ${imageFilenames.length}, failures: ${failures.length}`);
+      return {
+        success: failures.length === 0,
+        message: `Cleaned up ${imageFilenames.length - failures.length} images`,
+        cleanedImages: imageFilenames,
+        errors: failures.map(f => f.reason?.message).filter(Boolean)
+      };
+    }
+
+    console.log(`Product ${product._id} deleted. Images to cleanup (dry-run):`, imageFilenames);
+    return { success: true, message: `Identified ${imageFilenames.length} images`, cleanedImages: imageFilenames };
   } catch (error) {
     console.error('Error during image cleanup:', error);
     return {
@@ -66,14 +77,20 @@ export const cleanupUserAvatar = async (user) => {
     }
 
     const avatarFilename = extractFilenameFromFirebaseUrl(user.avatar);
-    
-    console.log(`User ${user._id} deleted. Avatar to cleanup:`, avatarFilename);
-    
-    return {
-      success: true,
-      message: 'Avatar cleaned up successfully',
-      cleanedAvatar: avatarFilename
-    };
+
+    if (bucket) {
+      try {
+        await bucket.file(avatarFilename).delete({ ignoreNotFound: true });
+        console.log(`User ${user._id} deleted. Avatar cleaned:`, avatarFilename);
+        return { success: true, message: 'Avatar cleaned up successfully', cleanedAvatar: avatarFilename };
+      } catch (e) {
+        console.error('Error deleting avatar from Firebase:', e);
+        return { success: false, message: 'Failed to cleanup avatar', error: e.message };
+      }
+    }
+
+    console.log(`User ${user._id} deleted. Avatar to cleanup (dry-run):`, avatarFilename);
+    return { success: true, message: 'Avatar identified for cleanup', cleanedAvatar: avatarFilename };
   } catch (error) {
     console.error('Error during avatar cleanup:', error);
     return {

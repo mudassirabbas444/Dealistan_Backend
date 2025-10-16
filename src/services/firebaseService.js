@@ -1,21 +1,16 @@
+import { bucket } from '../global/firebaseAdmin.js';
+
 export const deleteFirebaseImage = async (fileName) => {
   try {
     if (!fileName) {
       throw new Error('File name is required');
     }
-
-    // TODO: Implement actual Firebase Admin SDK deletion
-    // const admin = require('firebase-admin');
-    // const bucket = admin.storage().bucket();
-    // await bucket.file(fileName).delete();
-    
+    if (!bucket) {
+      throw new Error('Firebase Storage bucket is not initialized');
+    }
+    await bucket.file(fileName).delete({ ignoreNotFound: true });
     console.log(`Firebase image deleted: ${fileName}`);
-    
-    return {
-      success: true,
-      message: 'Image deleted successfully',
-      fileName
-    };
+    return { success: true, message: 'Image deleted successfully', fileName };
   } catch (error) {
     console.error('Error deleting Firebase image:', error);
     throw new Error(`Failed to delete image: ${error.message}`);
@@ -126,13 +121,23 @@ export const cleanupProductImages = async (product) => {
     });
 
     if (filePaths.length > 0) {
-      const deleteResult = await deleteMultipleFirebaseImages(filePaths);
-      
+      if (bucket) {
+        const results = await Promise.allSettled(
+          filePaths.map(fp => bucket.file(fp).delete({ ignoreNotFound: true }))
+        );
+        const failed = results.filter(r => r.status === 'rejected');
+        return {
+          success: failed.length === 0,
+          message: `Cleaned up ${filePaths.length - failed.length} images`,
+          cleanedImages: filePaths,
+          errors: [...errors, ...failed.map(f => f.reason?.message).filter(Boolean)]
+        };
+      }
       return {
-        success: deleteResult.success,
-        message: `Cleaned up ${deleteResult.deletedCount} images`,
+        success: true,
+        message: `Identified ${filePaths.length} images (dry-run)`,
         cleanedImages: filePaths,
-        errors: [...errors, ...deleteResult.errors.map(e => e.error)]
+        errors
       };
     }
 

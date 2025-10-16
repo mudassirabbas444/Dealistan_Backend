@@ -2,69 +2,9 @@
  * Email service using nodemailer
  */
 
-import nodemailer from 'nodemailer';
+import admin, { db } from '../global/firebaseAdmin.js';
 
-// Create transporter function (lazy loading)
-const createTransporter = () => {
-  console.log('Email Service Configuration:');
-  console.log('EMAIL_SERVICE:', process.env.EMAIL_SERVICE || 'gmail');
-  console.log('EMAIL_USER:', process.env.EMAIL_USER ? 'Set' : 'Not set');
-  console.log('EMAIL_PASS:', process.env.EMAIL_PASS ? 'Set' : 'Not set');
-  console.log('SMTP_USER:', process.env.SMTP_USER ? 'Set' : 'Not set');
-  console.log('SMTP_PASS:', process.env.SMTP_PASS ? 'Set' : 'Not set');
-  console.log('NODE_ENV:', process.env.NODE_ENV);
-
-  // Use EMAIL_* variables first, fallback to SMTP_* variables
-  const emailUser = process.env.EMAIL_USER || process.env.SMTP_USER;
-  const emailPass = process.env.EMAIL_PASS || process.env.SMTP_PASS;
-  const emailService = process.env.EMAIL_SERVICE || 'gmail';
-
-  console.log('Using email credentials:');
-  console.log('User:', emailUser ? 'Set' : 'Not set');
-  console.log('Pass:', emailPass ? 'Set' : 'Not set');
-
-  // Check if SendGrid is configured
-  const sendGridApiKey = process.env.SENDGRID_API_KEY;
-  
-  if (sendGridApiKey) {
-    console.log('Using SendGrid email service');
-    return nodemailer.createTransport({
-      service: 'SendGrid',
-      auth: {
-        user: 'apikey',
-        pass: sendGridApiKey,
-      },
-    });
-  }
-  
-  // For production, use more robust SMTP configuration
-  if (process.env.NODE_ENV === 'production') {
-    console.log('Using production SMTP configuration (Gmail)');
-    
-    return nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false,
-      auth: { user: emailUser, pass: emailPass },
-      tls: { rejectUnauthorized: false },
-      connectionTimeout: 30000,
-      greetingTimeout: 15000,
-      socketTimeout: 30000,
-      debug: false,
-      logger: false
-    });
-  } else {
-    // For development, use simple service configuration
-    console.log('Using development SMTP configuration');
-    return nodemailer.createTransport({
-      service: emailService,
-      auth: {
-        user: emailUser,
-        pass: emailPass,
-      },
-    });
-  }
-};
+// Email is handled solely by Firebase Trigger Email Extension via Firestore
 
 /**
  * Send email using nodemailer
@@ -75,71 +15,45 @@ const createTransporter = () => {
  * @param {string} emailData.text - Email text content (optional)
  * @returns {Promise<Object>} - Send result
  */
-export const sendEmail = async (emailData, retryCount = 0) => {
-  const maxRetries = process.env.NODE_ENV === 'production' ? 2 : 1;
-  
+export const sendEmail = async (emailData) => {
   try {
-    const { to, subject, html, text } = emailData;
-    
+    const { to, subject, html, text, cc, bcc, attachments } = emailData;
     if (!to || !subject || !html) {
       throw new Error('Missing required email fields: to, subject, html');
     }
 
-    // Create transporter when needed
-    const transporter = createTransporter();
-    const emailUser = process.env.EMAIL_USER || process.env.SMTP_USER;
-
-    const mailOptions = {
-      from: `"Dealistaan" <${emailUser}>`,
-      to,
-      subject,
-      html,
-      text: text || html.replace(/<[^>]*>/g, ''), // Strip HTML for text version
-    };
-
-    console.log(`Attempting to send email (attempt ${retryCount + 1}/${maxRetries + 1})`);
-    const result = await transporter.sendMail(mailOptions);
-    
-    console.log('Email sent successfully:', result.messageId);
-    
-    return {
-      success: true,
-      messageId: result.messageId,
-      message: 'Email sent successfully'
-    };
-  } catch (error) {
-    console.error(`Error sending email (attempt ${retryCount + 1}):`, error);
-    
-    // Retry logic for production
-    if (retryCount < maxRetries && process.env.NODE_ENV === 'production') {
-      console.log(`Retrying email send in 2 seconds... (${retryCount + 1}/${maxRetries})`);
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      return sendEmail(emailData, retryCount + 1);
+    if (!db) {
+      throw new Error('Firestore is not initialized');
     }
-    
-    throw new Error(`Failed to send email: ${error.message}`);
+
+    const mailDoc = {
+      to,
+      message: {
+        subject,
+        html,
+        text: (typeof text === 'string' && text.length > 0) ? text : html.replace(/<[^>]*>/g, '')
+      }
+    };
+    if (Array.isArray(cc) && cc.length > 0) mailDoc.cc = cc;
+    if (Array.isArray(bcc) && bcc.length > 0) mailDoc.bcc = bcc;
+    if (Array.isArray(attachments) && attachments.length > 0) mailDoc.attachments = attachments;
+
+    const ref = await db.collection('mail').add(mailDoc);
+    console.log('Queued email via Firestore mail doc:', ref.id);
+    return { success: true, messageId: ref.id, message: 'Email queued' };
+  } catch (error) {
+    console.error('Error queueing email:', error);
+    return { success: false, message: 'Failed to queue email', error: error.message };
   }
 };
-
-/**
- * Verify email configuration
- * @returns {Promise<Object>} - Verification result
- */
 export const verifyEmailConfig = async () => {
   try {
-    const transporter = createTransporter();
-    await transporter.verify();
-    return {
-      success: true,
-      message: 'Email configuration is valid'
-    };
+    if (!db) throw new Error('Firestore is not initialized');
+    await db.collection('_health').doc('email').set({ ts: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    return { success: true, message: 'Firestore available for email queue' };
   } catch (error) {
     console.error('Email configuration error:', error);
-    return {
-      success: false,
-      message: 'Email configuration is invalid',
-      error: error.message
-    };
+    return { success: false, message: 'Email queue unavailable', error: error.message };
   }
 };
 
