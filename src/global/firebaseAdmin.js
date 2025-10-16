@@ -7,7 +7,6 @@ function getServiceAccountFromEnv() {
   if (svcPath) {
     try {
       const resolved = path.isAbsolute(svcPath) ? svcPath : path.resolve(process.cwd(), svcPath);
-      console.log(resolved);
       const raw = fs.readFileSync(resolved, 'utf8');
       const svc = JSON.parse(raw);
       return {
@@ -44,7 +43,6 @@ function getServiceAccountFromEnv() {
 
 if (admin.apps.length === 0) {
   const serviceAccount = getServiceAccountFromEnv();
-  console.log(serviceAccount);
   const options = {};
   if (serviceAccount) {
     options.credential = admin.credential.cert({
@@ -56,9 +54,19 @@ if (admin.apps.length === 0) {
       options.projectId = serviceAccount.projectId;
     }
   } else {
-    // Fallback to ADC if available (e.g., GOOGLE_APPLICATION_CREDENTIALS)
-    options.credential = admin.credential.applicationDefault();
+    throw new Error(
+      'Firebase Admin credentials not found. Set FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT or FIREBASE_PROJECT_ID/FIREBASE_CLIENT_EMAIL/FIREBASE_PRIVATE_KEY.'
+    );
   }
+  // Log which credential source is used (without sensitive data)
+  try {
+    const source = process.env.FIREBASE_SERVICE_ACCOUNT_PATH
+      ? 'path'
+      : process.env.FIREBASE_SERVICE_ACCOUNT
+      ? 'json-env'
+      : 'vars';
+    console.log(`[firebaseAdmin] Using credential source: ${source} for project ${options.projectId || 'unknown'}`);
+  } catch (_) {}
   // Ensure projectId is set even if using ADC
   if (!options.projectId) {
     const envProjectId = process.env.FIREBASE_PROJECT_ID
@@ -77,6 +85,28 @@ if (admin.apps.length === 0) {
     options.storageBucket = bucketName;
   }
   admin.initializeApp(options);
+  // Auth preflight: try to obtain an access token and ping Firestore for clearer diagnostics
+  try {
+    const cred = admin.app().options?.credential;
+    if (cred && typeof cred.getAccessToken === 'function') {
+      cred.getAccessToken()
+        .then(() => {
+          // no-op on success
+        })
+        .catch((e) => {
+          console.error('[firebaseAdmin] Failed to obtain access token:', e?.message || e);
+        });
+    }
+    // Firestore lightweight ping
+    try {
+      const pingRef = admin.firestore?.().collection('_health').doc('init');
+      if (pingRef) {
+        pingRef.set({ ts: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }).catch((e) => {
+          console.error('[firebaseAdmin] Firestore write preflight failed:', e?.message || e);
+        });
+      }
+    } catch (_) {}
+  } catch (_) {}
 }
 
 export default admin;
