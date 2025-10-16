@@ -1,4 +1,5 @@
 import admin from 'firebase-admin';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
@@ -12,7 +13,9 @@ function getServiceAccountFromEnv() {
       return {
         projectId: svc.project_id,
         clientEmail: svc.client_email,
-        privateKey: (svc.private_key || '').replace(/\\n/g, '\n')
+        privateKey: (svc.private_key || '').replace(/\\n/g, '\n'),
+        keyId: svc.private_key_id,
+        source: 'path'
       };
     } catch (_) {
       // fall through
@@ -25,7 +28,9 @@ function getServiceAccountFromEnv() {
       return {
         projectId: parsed.project_id,
         clientEmail: parsed.client_email,
-        privateKey: parsed.private_key?.replace(/\\n/g, '\n')
+        privateKey: parsed.private_key?.replace(/\\n/g, '\n'),
+        keyId: parsed.private_key_id,
+        source: 'json-env'
       };
     } catch (_) {
       // fall through
@@ -35,7 +40,9 @@ function getServiceAccountFromEnv() {
     return {
       projectId: process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      keyId: undefined,
+      source: 'vars'
     };
   }
   return null;
@@ -60,12 +67,17 @@ if (admin.apps.length === 0) {
   }
   // Log which credential source is used (without sensitive data)
   try {
-    const source = process.env.FIREBASE_SERVICE_ACCOUNT_PATH
-      ? 'path'
-      : process.env.FIREBASE_SERVICE_ACCOUNT
-      ? 'json-env'
-      : 'vars';
+    const source = serviceAccount.source || (process.env.FIREBASE_SERVICE_ACCOUNT_PATH ? 'path' : (process.env.FIREBASE_SERVICE_ACCOUNT ? 'json-env' : 'vars'));
+    const keyFingerprint = serviceAccount.privateKey
+      ? crypto.createHash('sha256').update(serviceAccount.privateKey).digest('hex').slice(0, 12)
+      : 'none';
+    const maskedEmail = typeof serviceAccount.clientEmail === 'string'
+      ? serviceAccount.clientEmail.replace(/(^.{3}).*(@.*$)/, '$1***$2')
+      : 'unknown';
     console.log(`[firebaseAdmin] Using credential source: ${source} for project ${options.projectId || 'unknown'}`);
+    console.log(
+      `[firebaseAdmin] Cred details -> clientEmail=${maskedEmail}, private_key_id=${serviceAccount.keyId || 'n/a'}, key_fingerprint=${keyFingerprint}`
+    );
   } catch (_) {}
   // Ensure projectId is set even if using ADC
   if (!options.projectId) {
