@@ -78,7 +78,10 @@ if (admin.apps.length === 0) {
     console.log(
       `[firebaseAdmin] Cred details -> clientEmail=${maskedEmail}, private_key_id=${serviceAccount.keyId || 'n/a'}, key_fingerprint=${keyFingerprint}`
     );
-  } catch (_) {}
+    console.log(`[firebaseAdmin] Debug - serviceAccount keys:`, Object.keys(serviceAccount));
+  } catch (e) {
+    console.error('[firebaseAdmin] Logging error:', e.message);
+  }
   // Ensure projectId is set even if using ADC
   if (!options.projectId) {
     const envProjectId = process.env.FIREBASE_PROJECT_ID
