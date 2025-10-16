@@ -4,6 +4,33 @@ import fs from 'fs';
 import path from 'path';
 
 function getServiceAccountFromEnv() {
+  // 1) Prefer explicit individual env vars
+  if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+    return {
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      keyId: process.env.FIREBASE_PRIVATE_KEY_ID,
+      source: 'vars'
+    };
+  }
+  // 2) Then prefer JSON env var
+  const json = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (json) {
+    try {
+      const parsed = JSON.parse(json);
+      return {
+        projectId: parsed.project_id,
+        clientEmail: parsed.client_email,
+        privateKey: parsed.private_key?.replace(/\\n/g, '\n'),
+        keyId: parsed.private_key_id,
+        source: 'json-env'
+      };
+    } catch (_) {
+      // fall through
+    }
+  }
+  // 3) Finally, allow file path fallback
   const svcPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
   if (svcPath) {
     try {
@@ -21,30 +48,6 @@ function getServiceAccountFromEnv() {
       // fall through
     }
   }
-  const json = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (json) {
-    try {
-      const parsed = JSON.parse(json);
-      return {
-        projectId: parsed.project_id,
-        clientEmail: parsed.client_email,
-        privateKey: parsed.private_key?.replace(/\\n/g, '\n'),
-        keyId: parsed.private_key_id,
-        source: 'json-env'
-      };
-    } catch (_) {
-      // fall through
-    }
-  }
-  if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
-    return {
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-      keyId: undefined,
-      source: 'vars'
-    };
-  }
   return null;
 }
 
@@ -60,6 +63,17 @@ if (admin.apps.length === 0) {
     if (serviceAccount.projectId) {
       options.projectId = serviceAccount.projectId;
     }
+    // Warn if multiple sources are set to avoid confusion
+    try {
+      const sources = [
+        process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY ? 'vars' : null,
+        process.env.FIREBASE_SERVICE_ACCOUNT ? 'json-env' : null,
+        process.env.FIREBASE_SERVICE_ACCOUNT_PATH ? 'path' : null
+      ].filter(Boolean);
+      if (sources.length > 1) {
+        console.warn(`[firebaseAdmin] Multiple credential sources are set (${sources.join(', ')}). Using: ${serviceAccount.source}.`);
+      }
+    } catch (_) {}
   } else {
     throw new Error(
       'Firebase Admin credentials not found. Set FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT or FIREBASE_PROJECT_ID/FIREBASE_CLIENT_EMAIL/FIREBASE_PRIVATE_KEY.'
