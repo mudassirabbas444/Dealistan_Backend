@@ -49,6 +49,10 @@ const productSchema = new mongoose.Schema(
       city: String,
       area: String,
       address: String,
+      coordinates: {
+        latitude: Number,
+        longitude: Number,
+      },
     },
 
     seller: {
