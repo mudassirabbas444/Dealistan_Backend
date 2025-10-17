@@ -1,3 +1,4 @@
+// src/global/firebaseAdmin.js
 import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
@@ -12,13 +13,19 @@ if (!admin.apps.length) {
     ? parsed.private_key.replace(/\\n/g, '\n')
     : parsed.private_key;
 
+  const bucketName =
+    process.env.FIREBASE_STORAGE_BUCKET ||
+    process.env.STORAGEBUCKET ||
+    process.env.REACT_APP_FIREBASE_STORAGE_BUCKET ||
+    `${parsed.project_id}.appspot.com`;
+
   admin.initializeApp({
     credential: admin.credential.cert({
       projectId: parsed.project_id,
       clientEmail: parsed.client_email,
       privateKey,
     }),
-    storageBucket: `${parsed.project_id}.appspot.com`,
+    storageBucket: bucketName,
   });
 }
 
