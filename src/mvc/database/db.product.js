@@ -57,6 +57,11 @@ export const searchProducts=async(filter,options)=>{
         if(filter.location){
             query["location.city"]=filter.location;
         }
+        // Coordinate-based search/sort: lat, lon, optional radiusKm
+        let useNearStage = false;
+        if (typeof filter.lat === 'number' && typeof filter.lon === 'number') {
+            useNearStage = true;
+        }
         if(filter.condition){
             query.condition=filter.condition;
         }
@@ -66,19 +71,80 @@ export const searchProducts=async(filter,options)=>{
         const page=parseInt(options.page) || 1;
         const limit=parseInt(options.limit) || 20;
         const skip=(page-1)*limit;
-        const products=await Product.find(query)
-        .populate("category")
-        .populate("seller","-password -email -role")  
-        .sort({createdAt:-1})
-        .skip(skip)
-        .limit(limit);
-        const total=await Product.countDocuments(query);
-        return {
-            products,
-            total,
-            page,
-            pages:Math.ceil(total/limit)
-        };
+        if (!useNearStage) {
+            // Default path: no coordinates provided → normal query sorted by createdAt
+            const products=await Product.find(query)
+            .populate("category")
+            .populate("seller","-password -email -role")  
+            .sort({createdAt:-1})
+            .skip(skip)
+            .limit(limit);
+            const total=await Product.countDocuments(query);
+            return {
+                products,
+                total,
+                page,
+                pages:Math.ceil(total/limit)
+            };
+        } else {
+            // Use $geoNear for distance-based ordering, optionally limit by radius
+            const radiusMeters = typeof filter.radiusKm === 'number' ? filter.radiusKm * 1000 : null;
+            const pipeline = [];
+            pipeline.push({
+                $geoNear: {
+                    near: { type: "Point", coordinates: [filter.lon, filter.lat] },
+                    distanceField: "distance",
+                    key: "location.geo",
+                    spherical: true,
+                    ...(radiusMeters ? { maxDistance: radiusMeters } : {})
+                }
+            });
+            // Apply non-geo filters
+            if (Object.keys(query).length > 0) {
+                pipeline.push({ $match: query });
+            }
+            // Sorting: closest first already by $geoNear, then newest
+            pipeline.push({ $sort: { distance: 1, createdAt: -1 } });
+            // Pagination
+            pipeline.push({ $skip: skip });
+            pipeline.push({ $limit: limit });
+            // Lookups to populate
+            pipeline.push(
+                { $lookup: { from: 'categories', localField: 'category', foreignField: '_id', as: 'category' } },
+            );
+            pipeline.push({ $unwind: { path: '$category', preserveNullAndEmptyArrays: true } });
+            pipeline.push(
+                { $lookup: { from: 'users', localField: 'seller', foreignField: '_id', as: 'seller' } },
+            );
+            pipeline.push({ $unwind: { path: '$seller', preserveNullAndEmptyArrays: true } });
+
+            const results = await Product.aggregate(pipeline);
+
+            // Total count for pagination with same filters (without pagination stages)
+            const countPipeline = [];
+            countPipeline.push({
+                $geoNear: {
+                    near: { type: "Point", coordinates: [filter.lon, filter.lat] },
+                    distanceField: "distance",
+                    key: "location.geo",
+                    spherical: true,
+                    ...(radiusMeters ? { maxDistance: radiusMeters } : {})
+                }
+            });
+            if (Object.keys(query).length > 0) {
+                countPipeline.push({ $match: query });
+            }
+            countPipeline.push({ $count: 'total' });
+            const totalDocs = await Product.aggregate(countPipeline);
+            const total = totalDocs?.[0]?.total || 0;
+
+            return {
+                products: results,
+                total,
+                page,
+                pages: Math.ceil(total/limit)
+            };
+        }
     }   
     catch(error){
         throw new Error("Error searching products: "+error.message);

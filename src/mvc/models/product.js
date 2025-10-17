@@ -49,10 +49,23 @@ const productSchema = new mongoose.Schema(
       city: String,
       area: String,
       address: String,
+      // Lat/Lon kept for readability
       coordinates: {
         latitude: Number,
         longitude: Number,
       },
+      // GeoJSON point for geo queries
+      geo: {
+        type: {
+          type: String,
+          enum: ['Point'],
+          default: 'Point'
+        },
+        coordinates: {
+          type: [Number], // [longitude, latitude]
+          index: '2dsphere'
+        }
+      }
     },
 
     seller: {

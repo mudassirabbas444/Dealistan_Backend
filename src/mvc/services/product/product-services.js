@@ -114,7 +114,20 @@ const createProductService=async(req)=>{
             phoneNumber: req.body.phoneNumber.trim(),
             negotiable: req.body.negotiable === 'true' || req.body.negotiable === true,
             tags: tags,
-            location: location,
+            location: {
+                ...location,
+                ...(location?.coordinates && typeof location.coordinates.latitude === 'number' && typeof location.coordinates.longitude === 'number'
+                    ? {
+                        geo: {
+                            type: 'Point',
+                            coordinates: [
+                                Number(location.coordinates.longitude),
+                                Number(location.coordinates.latitude)
+                            ]
+                        }
+                      }
+                    : {})
+            },
             images: images,
             seller: req?.user?.id
         };
@@ -312,6 +325,18 @@ const searchProductsService=async(req)=>{
         }
         if (req?.query?.keywords) filter.keywords = req.query.keywords;
         if (req?.query?.location) filter.location = req.query.location;
+        if (req?.query?.lat) {
+            const lat = parseFloat(req.query.lat);
+            if (!isNaN(lat)) filter.lat = lat;
+        }
+        if (req?.query?.lon) {
+            const lon = parseFloat(req.query.lon);
+            if (!isNaN(lon)) filter.lon = lon;
+        }
+        if (req?.query?.radiusKm) {
+            const r = parseFloat(req.query.radiusKm);
+            if (!isNaN(r)) filter.radiusKm = r;
+        }
         if (req?.query?.condition) filter.condition = req.query.condition;
         if (req?.query?.seller) filter.seller = req.query.seller;
         const options={
